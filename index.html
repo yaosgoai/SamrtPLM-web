@@ -57,11 +57,29 @@ window.SMARTPLM_CONFIG = {
         splash.querySelector('.spin').remove();
         return;
       }
-      var timer = setTimeout(function () { splash.classList.add('late'); }, 8000);
-      frame.addEventListener('load', function () {
-        clearTimeout(timer);
+      // 系統載入完成時會用 postMessage 回報「ready」；只靠 iframe 的 load 事件不可靠
+      // （iframe 裡顯示的是錯誤頁時也會觸發 load），所以等不到回報就自動改為直接開啟系統網址
+      var ready = false;
+      function shown() {
+        if (ready) return;
+        ready = true;
+        clearTimeout(timer); clearTimeout(fallback);
         splash.classList.add('gone');
+      }
+      function goDirect(reason) {
+        if (ready) return;
+        try { console.warn('SmartPLM 內嵌載入失敗，改為直接開啟：' + reason); } catch (e) { /* 略過 */ }
+        splash.querySelector('.slow').textContent = '正在改為直接開啟系統…';
+        splash.classList.add('late');
+        location.replace(url);
+      }
+      window.addEventListener('message', function (e) {
+        if (!/^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(e.origin)) return;
+        if (e.data && e.data.smartplm === 'ready') shown();
       });
+      var timer = setTimeout(function () { splash.classList.add('late'); }, 8000);
+      var fallback = setTimeout(function () { goDirect('timeout'); }, 25000);
+      frame.addEventListener('error', function () { goDirect('error'); });
       frame.src = url;
     })();
   </script>
