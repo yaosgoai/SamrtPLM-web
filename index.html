@@ -38,7 +38,7 @@ window.SMARTPLM_CONFIG = {
     <div class="title" id="appName">SmartPLM</div>
     <div class="sub" id="subtitle">專案生命週期管理系統</div>
     <div class="spin"></div>
-    <div class="slow">系統載入中，Google 伺服器第一次啟動可能需要幾秒鐘。<br>若一直沒有出現登入畫面，請<a id="openNew" href="#" target="_blank" rel="noopener">在新分頁開啟系統</a>。</div>
+    <div class="slow">系統載入中，伺服器第一次啟動可能需要幾秒鐘。<br>若一直沒有出現登入畫面，請<a id="reload" href="#">重新整理頁面</a>。</div>
   </div>
   <iframe id="app" title="SmartPLM 專案管理系統" allow="clipboard-write; fullscreen" referrerpolicy="no-referrer-when-downgrade"></iframe>
   <noscript>請啟用 JavaScript 後再開啟本系統。</noscript>
@@ -50,36 +50,28 @@ window.SMARTPLM_CONFIG = {
       if (cfg.subtitle) document.getElementById('subtitle').textContent = cfg.subtitle;
       var splash = document.getElementById('splash');
       var frame = document.getElementById('app');
-      document.getElementById('openNew').href = url;
+      document.getElementById('reload').onclick = function (e) { e.preventDefault(); location.reload(); };
       if (!url) {
         splash.classList.add('late');
         splash.querySelector('.slow').textContent = '尚未設定系統網址，請在 config.js 填入 gasUrl。';
         splash.querySelector('.spin').remove();
         return;
       }
-      // 系統載入完成時會用 postMessage 回報「ready」；只靠 iframe 的 load 事件不可靠
-      // （iframe 裡顯示的是錯誤頁時也會觸發 load），所以等不到回報就自動改為直接開啟系統網址
-      var ready = false;
+      // 系統載入完成時會用 postMessage 回報「ready」，收到就移除載入畫面；
+      // 舊版系統沒有回報時，以 iframe 的 load 事件為準（稍等一下避免閃爍）
+      var done = false;
       function shown() {
-        if (ready) return;
-        ready = true;
-        clearTimeout(timer); clearTimeout(fallback);
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
         splash.classList.add('gone');
-      }
-      function goDirect(reason) {
-        if (ready) return;
-        try { console.warn('SmartPLM 內嵌載入失敗，改為直接開啟：' + reason); } catch (e) { /* 略過 */ }
-        splash.querySelector('.slow').textContent = '正在改為直接開啟系統…';
-        splash.classList.add('late');
-        location.replace(url);
       }
       window.addEventListener('message', function (e) {
         if (!/^https:\/\/([a-z0-9-]+\.)*(googleusercontent\.com|google\.com)$/.test(e.origin)) return;
         if (e.data && e.data.smartplm === 'ready') shown();
       });
+      frame.addEventListener('load', function () { setTimeout(shown, 1500); });
       var timer = setTimeout(function () { splash.classList.add('late'); }, 8000);
-      var fallback = setTimeout(function () { goDirect('timeout'); }, 25000);
-      frame.addEventListener('error', function () { goDirect('error'); });
       frame.src = url;
     })();
   </script>
